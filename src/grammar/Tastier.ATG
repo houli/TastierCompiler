@@ -7,7 +7,8 @@ COMPILER Tastier
   enum TastierType : int {   // types for variables
     Undefined,
     Integer,
-    Boolean
+    Boolean,
+    String
   };
 
   enum TastierKind : int {  // kinds of symbol
@@ -247,18 +248,24 @@ Symbol lookup(Stack<Scope> scopes, string name) {
   manipulate them, you can LoadG and StoG to those locations.
 */
 
+// Strings will be stored at the end of data memory (end index is 4091 subtraction of 3 in the machine)
+int globalStorePosition = 4094;
 /*--------------------------------------------------------------------------*/
 
 CHARACTERS
 letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".
-  digit = "0123456789".
-  cr  = '\r'.
-  lf  = '\n'.
-  tab = '\t'.
+digit = "0123456789".
+special = "?!@#$%^&*(){}[]<>:;,.~`|/\\'+=-_".
+cr  = '\r'.
+lf  = '\n'.
+tab = '\t'.
+quote = '"'.
+space = ' '.
 
 TOKENS
   ident  = letter {letter | digit}.
   number = digit {digit}.
+  str = quote {space | letter | digit | tab | special} quote.
 
 COMMENTS FROM "/*" TO "*/" NESTED
 COMMENTS FROM "//" TO lf
@@ -327,6 +334,20 @@ Factor<out TastierType type>    (.  int n; Symbol sym; string name; .)
                                     n = Convert.ToInt32(t.val);
                                     program.Add(new Instruction("", "Const " + n));
                                     type = TastierType.Integer;
+                                .)
+  | str                         (.
+                                    // Remove quotes from the matched token
+                                    string str = t.val.Trim(new Char[] {'"'});
+                                    int temp = globalStorePosition;
+                                    program.Add(new Instruction("", "Const " + str.Length));
+                                    program.Add(new Instruction("", "StoG " + globalStorePosition--));
+                                    foreach (char c in str) {
+                                      program.Add(new Instruction("", "Const " + (int) c));
+                                      program.Add(new Instruction("", "StoG " + globalStorePosition--));
+                                    }
+                                    // Pointer to our string
+                                    program.Add(new Instruction("", "Const " + temp));
+                                    type = TastierType.String;
                                 .)
   | '-'
     Factor<out type>            (.
@@ -451,7 +472,7 @@ Stat                            (.  TastierType type; string name; Symbol sym; b
                                 .)
   ( ":="                        (.
                                     if ((TastierKind)sym.Item2 == TastierKind.Const) {
-                                      SemErr("constant identifier " + sym.Item1 + " cannot be reassigned");
+                                      SemErr("constant identifier " + name + " cannot be reassigned");
                                     } else if ((TastierKind)sym.Item2 != TastierKind.Var) {
                                       SemErr("cannot assign to non-variable");
                                     }
@@ -534,7 +555,9 @@ Stat                            (.  TastierType type; string name; Symbol sym; b
                                       SemErr("reference to undefined variable " + name);
                                     }
 
-                                    if (sym.Item2 != (int)TastierKind.Var) {
+                                    if ((TastierKind)sym.Item2 == TastierKind.Const) {
+                                      SemErr("constant identifier " + name + " cannot be reassigned");
+                                    } else if (sym.Item2 != (int)TastierKind.Var) {
                                       SemErr("variable type expected but " + sym.Item1 + " has kind " + (TastierType)sym.Item2);
                                     }
 
@@ -558,12 +581,25 @@ Stat                            (.  TastierType type; string name; Symbol sym; b
                                 .)
 
 | "write"
-  Expr<out type> ';'            (.
-                                    if (type != TastierType.Integer) {
-                                      SemErr("integer type expected");
+  Expr<out type>                (.
+                                    if (type == TastierType.Integer) {
+                                      program.Add(new Instruction("", "Write"));
+                                    } else if (type == TastierType.String) {
+                                      program.Add(new Instruction("", "WriteS"));
+                                    } else {
+                                      SemErr("integer or string type expected");
                                     }
-                                    program.Add(new Instruction("", "Write"));
                                 .)
+  { ',' Expr<out type>          (.
+                                    if (type == TastierType.Integer) {
+                                      program.Add(new Instruction("", "Write"));
+                                    } else if (type == TastierType.String) {
+                                      program.Add(new Instruction("", "WriteS"));
+                                    } else {
+                                      SemErr("integer or string type expected");
+                                    }
+                                .)
+  } ';'
 
 | '{' { Stat | VarDecl<external> | ConstDecl } '}' .
 
@@ -638,6 +674,7 @@ Type<out TastierType type>
 =                               (.  type = TastierType.Undefined; .)
  ( "int"                        (.  type = TastierType.Integer; .)
  | "bool"                       (.  type = TastierType.Boolean; .)
+ | "string"                     (.  type = TastierType.String; .)
  ).
 
 /*------------------------------------------------------------------------*/
