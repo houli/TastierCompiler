@@ -1,0 +1,11 @@
+program Test {
+  const string x := "hello world!";
+  void Main() {
+    string y;
+    y := "Eoin";
+    const string z := "hello Eoin!";
+    write x;
+    write y;
+    write z;
+  }
+}

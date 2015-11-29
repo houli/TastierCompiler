@@ -1,0 +1,16 @@
+program Test {
+  const int x := 12;
+
+  void Main() {
+    int y;
+    y := 4;
+    const int z := x - y;
+
+    if (z >= 8) {
+      write y;
+    }
+    if (z < 7) {
+      write x;
+    }
+  }
+}
