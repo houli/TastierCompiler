@@ -1,0 +1,7 @@
+program Test {
+  string x;
+  void Main() {
+    x := 2 > 3 ? "wowee" : "zip";
+    write x;
+  }
+}
