@@ -567,14 +567,14 @@ Stat                            (.
                                 .)
 | "for"
   '(' Stat                      (.
-                                    string startLabel = generateLabel();
                                     string updateLabel = generateLabel();
+                                    string condLabel = generateLabel();
                                     string endLabel = generateLabel();
-                                    program.Add(new Instruction("", "Jmp " + updateLabel));
-                                    program.Add(new Instruction(startLabel, "Nop"));
+                                    program.Add(new Instruction("", "Jmp " + condLabel));
+                                    program.Add(new Instruction(updateLabel, "Nop"));
                                 .)
   Stat                          (.
-                                    program.Add(new Instruction(updateLabel, "Nop"));
+                                    program.Add(new Instruction(condLabel, "Nop"));
                                 .)
   Expr<out type>
   ')' "do"                      (.
@@ -584,7 +584,7 @@ Stat                            (.
                                     program.Add(new Instruction("", "FJmp " + endLabel));
                                 .)
   Stat                          (.
-                                    program.Add(new Instruction("", "Jmp " + startLabel));
+                                    program.Add(new Instruction("", "Jmp " + updateLabel));
                                     program.Add(new Instruction(endLabel, "Nop"));
                                 .)
 
