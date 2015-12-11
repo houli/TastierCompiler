@@ -407,8 +407,7 @@ ProcDecl                        (.  string name; string label; Scope currentScop
                                     */
                                 .)
 
-  { CondAssign |
-    ConstDecl |
+  { ConstDecl |
     VarDecl<external> | Stat |  (.
                                     openLabels.Push(generateLabel());
                                     program.Add(new Instruction("", "Jmp " + openLabels.Peek()));
@@ -460,57 +459,10 @@ SimExpr<out TastierType type>   (.  TastierType type1; Instruction inst; .)
 
 /*------------------------------------------------------------------------*/
 
-CondAssign                      (. Symbol sym; TastierType type; string name; TastierType condType; .)
-=
-Ident<out name>                 (.
-                                    sym = lookup(openScopes, name);
-                                    if (sym == null) {
-                                      SemErr("reference to undefined variable " + name);
-                                    } else if ((TastierKind) sym.Item2 == TastierKind.Const) {
-                                      SemErr("constant identifier " + name + " cannot be reassigned");
-                                    }
+Stat                            (.
+                                    TastierType type; string name; Symbol sym; bool external = false; bool isExternal = false;
+                                    bool conditional = false; TastierType type1; TastierType type2;
                                 .)
-":="
-Expr<out condType>              (.
-                                    if (condType != TastierType.Boolean) {
-                                      SemErr("boolean expression expected in conditional assignment statement");
-                                    }
-                                    string midLabel = generateLabel(); // label to jump to assign second expression
-                                    program.Add(new Instruction("", "FJmp " + midLabel));
-                                .)
-'?'
-Expr<out type>                  (.
-                                    if (type != (TastierType) sym.Item3) {
-                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
-                                    }
-                                    if (sym.Item4 == 0) {
-                                      program.Add(new Instruction("", "StoG " + (sym.Item5+3)));
-                                    } else {
-                                      int lexicalLevelDifference = Math.Abs(openScopes.Count - sym.Item4)-1;
-                                      program.Add(new Instruction("", "Sto " + lexicalLevelDifference + " " + sym.Item5));
-                                    }
-                                    string endLabel = generateLabel();
-                                    program.Add(new Instruction("", "Jmp " + endLabel));
-                                    program.Add(new Instruction(midLabel, "Nop"));
-                                .)
-':'
-Expr<out type>                  (.
-                                    if (type != (TastierType) sym.Item3) {
-                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
-                                    }
-                                    if (sym.Item4 == 0) {
-                                      program.Add(new Instruction("", "StoG " + (sym.Item5+3)));
-                                    } else {
-                                      int lexicalLevelDifference = Math.Abs(openScopes.Count - sym.Item4)-1;
-                                      program.Add(new Instruction("", "Sto " + lexicalLevelDifference + " " + sym.Item5));
-                                    }
-                                    program.Add(new Instruction(endLabel, "Nop"));
-                                .)
-';'.
-
-/*------------------------------------------------------------------------*/
-
-Stat                            (.  TastierType type; string name; Symbol sym; bool external = false; bool isExternal = false; .)
 
 = Ident<out name>               (.
                                     sym = lookup(openScopes, name);
@@ -529,20 +481,38 @@ Stat                            (.  TastierType type; string name; Symbol sym; b
                                       SemErr("cannot assign to non-variable");
                                     }
                                 .)
-    Expr<out type> ';'
-                                (.
-                                    if (type != (TastierType)sym.Item3) {
-                                      SemErr("incompatible types");
+  Expr<out type>
+  [ '?'                         (.
+                                    conditional = true;
+                                    if (type != TastierType.Boolean) {
+                                      SemErr("boolean expression expected in conditional assignment statement");
+                                    }
+                                    string midLabel = generateLabel(); // label to jump to assign second expression
+                                    program.Add(new Instruction("", "FJmp " + midLabel));
+                                .)
+    Expr<out type1>              (.
+                                    if (type1 != (TastierType) sym.Item3) {
+                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
+                                    }
+                                    string endLabel = generateLabel();
+                                    program.Add(new Instruction("", "Jmp " + endLabel));
+                                    program.Add(new Instruction(midLabel, "Nop"));
+                                .)
+    ':'
+    Expr<out type2>              (.
+                                    if (type2 != (TastierType) sym.Item3) {
+                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
+                                    }
+                                    program.Add(new Instruction(endLabel, "Nop"));
+                                .)
+  ]
+  ';'                           (.
+                                    if (!conditional && type != (TastierType) sym.Item3) {
+                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
                                     }
                                     if (sym.Item4 == 0) {
-                                      if (isExternal) {
-                                        program.Add(new Instruction("", "StoG " + sym.Item1));
-                                        // if the symbol is external, we also store it by name. The linker will resolve the name to an address.
-                                      } else {
-                                        program.Add(new Instruction("", "StoG " + (sym.Item5+3)));
-                                      }
-                                    }
-                                    else {
+                                      program.Add(new Instruction("", "StoG " + (sym.Item5+3)));
+                                    } else {
                                       int lexicalLevelDifference = Math.Abs(openScopes.Count - sym.Item4)-1;
                                       program.Add(new Instruction("", "Sto " + lexicalLevelDifference + " " + sym.Item5));
                                     }
@@ -675,7 +645,7 @@ Stat                            (.  TastierType type; string name; Symbol sym; b
                                 .)
   } ';'
 
-| '{' { Stat | VarDecl<external> | ConstDecl | CondAssign } '}' .
+| '{' { Stat | VarDecl<external> | ConstDecl } '}' .
 
 /*------------------------------------------------------------------------*/
 
