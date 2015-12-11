@@ -595,6 +595,28 @@ Stat                            (.  TastierType type; string name; Symbol sym; b
       Stat                      (.  program.Add(new Instruction("", "Jmp " + loopStartLabel));
                                     program.Add(new Instruction(openLabels.Pop(), "Nop")); // put the loop end label here
                                 .)
+| "for"
+  '(' Stat                      (.
+                                    string startLabel = generateLabel();
+                                    string updateLabel = generateLabel();
+                                    string endLabel = generateLabel();
+                                    program.Add(new Instruction("", "Jmp " + updateLabel));
+                                    program.Add(new Instruction(startLabel, "Nop"));
+                                .)
+  Stat                          (.
+                                    program.Add(new Instruction(updateLabel, "Nop"));
+                                .)
+  Expr<out type>
+  ')' "do"                      (.
+                                    if (type != TastierType.Boolean) {
+                                      SemErr("boolean expression expected in for loop condition");
+                                    }
+                                    program.Add(new Instruction("", "FJmp " + endLabel));
+                                .)
+  Stat                          (.
+                                    program.Add(new Instruction("", "Jmp " + startLabel));
+                                    program.Add(new Instruction(endLabel, "Nop"));
+                                .)
 
 | "read"
   Ident<out name> ';'           (.

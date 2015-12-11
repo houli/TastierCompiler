@@ -1,0 +1,13 @@
+program Test {
+  void Main() {
+    int i;
+    for (i := 1; i := i + 1; i < 10) do {
+      int j;
+      for (j := 1; j := j + 1; j < 10) do {
+        write i;
+        write j;
+        write j * i;
+      }
+    }
+  }
+}
