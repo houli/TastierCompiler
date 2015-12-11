@@ -3,5 +3,9 @@ program Test {
   void Main() {
     x := 2 > 3 ? "wowee" : "zip";
     write x;
+    x := 2 = 3 ? "true?" : "false?";
+    write x;
+    x := 2 < 3 ? "this one" : "not this";
+    write x;
   }
 }
