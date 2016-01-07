@@ -8,7 +8,8 @@ COMPILER Tastier
     Undefined,
     Integer,
     Boolean,
-    String
+    String,
+    Character
   };
 
   enum TastierKind : int {  // kinds of symbol
@@ -255,17 +256,22 @@ int globalStorePosition = 4094;
 CHARACTERS
 letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".
 digit = "0123456789".
-special = "?!@#$%^&*(){}[]<>:;,.~`|/\\'+=-_".
+special = "?!@#$%^&*(){}[]<>:;,.~`|/\\'\"+=-_".
 cr  = '\r'.
 lf  = '\n'.
 tab = '\t'.
 quote = '"'.
+singlequote = '\''.
 space = ' '.
+characterSet = space + letter + digit + tab + special.
+stringCharacter = characterSet - '"'.
+charCharacter = characterSet - '\''.
 
 TOKENS
   ident  = letter {letter | digit}.
   number = digit {digit}.
-  str = quote {space | letter | digit | tab | special} quote.
+  str = quote {stringCharacter} quote.
+  character = singlequote charCharacter singlequote.
 
 COMMENTS FROM "/*" TO "*/" NESTED
 COMMENTS FROM "//" TO lf
@@ -348,6 +354,11 @@ Factor<out TastierType type>    (.  int n; Symbol sym; string name; .)
                                     // Pointer to our string
                                     program.Add(new Instruction("", "Const " + temp));
                                     type = TastierType.String;
+                                .)
+  | character                   (.  //Remove quotes from the matched token
+                                    char c = t.val.Trim(new Char[] {'\''})[0];
+                                    program.Add(new Instruction("", "Const " + (int) c));
+                                    type = TastierType.Character;
                                 .)
   | '-'
     Factor<out type>            (.
@@ -630,8 +641,10 @@ Stat                            (.
                                       program.Add(new Instruction("", "Write"));
                                     } else if (type == TastierType.String) {
                                       program.Add(new Instruction("", "WriteS"));
+                                    } else if (type == TastierType.Character) {
+                                      program.Add(new Instruction("", "WriteC"));
                                     } else {
-                                      SemErr("integer or string type expected");
+                                      SemErr("integer, character or string type expected");
                                     }
                                 .)
   { ',' Expr<out type>          (.
@@ -639,8 +652,10 @@ Stat                            (.
                                       program.Add(new Instruction("", "Write"));
                                     } else if (type == TastierType.String) {
                                       program.Add(new Instruction("", "WriteS"));
+                                    } else if (type == TastierType.Character) {
+                                      program.Add(new Instruction("", "WriteC"));
                                     } else {
-                                      SemErr("integer or string type expected");
+                                      SemErr("integer, character or string type expected");
                                     }
                                 .)
   } ';'
@@ -719,6 +734,7 @@ Type<out TastierType type>
  ( "int"                        (.  type = TastierType.Integer; .)
  | "bool"                       (.  type = TastierType.Boolean; .)
  | "string"                     (.  type = TastierType.String; .)
+ | "char"                       (.  type = TastierType.Character; .)
  ).
 
 /*------------------------------------------------------------------------*/
