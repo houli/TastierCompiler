@@ -240,6 +240,22 @@ Symbol lookup(Stack<Scope> scopes, string name) {
   return null; // if the name wasn't found in any open scopes.
 }
 
+void TypeErr(TastierType expected, TastierType actual) {
+  SemErr("expected type" + expected + ", got type " + actual);
+}
+
+void EmitWrite(TastierType type) {
+  if (type == TastierType.Integer) {
+    program.Add(new Instruction("", "Write"));
+  } else if (type == TastierType.String) {
+    program.Add(new Instruction("", "WriteS"));
+  } else if (type == TastierType.Character) {
+    program.Add(new Instruction("", "WriteC"));
+  } else {
+    SemErr("integer, character or string type expected");
+  }
+}
+
 /*
   You may notice that when we use a LoadG or StoG instruction, we add 3 to
   the address of the item being loaded or stored. This is because the
@@ -295,7 +311,7 @@ Expr<out TastierType type>      (.  TastierType type1; Instruction inst; .)
   [ RelOp<out inst>
     SimExpr<out type1>          (.
                                     if (type != type1) {
-                                      SemErr("incompatible types");
+                                      TypeErr(type1, type);
                                     }
                                     else {
                                       program.Add(inst);
@@ -363,7 +379,7 @@ Factor<out TastierType type>    (.  int n; Symbol sym; string name; .)
   | '-'
     Factor<out type>            (.
                                     if (type != TastierType.Integer) {
-                                      SemErr("integer type expected");
+                                      TypeErr(TastierType.Integer, type);
                                       type = TastierType.Integer;
                                     }
                                     program.Add(new Instruction("", "Neg"));
@@ -461,8 +477,10 @@ SimExpr<out TastierType type>   (.  TastierType type1; Instruction inst; .)
 = Term<out type>
   { AddOp<out inst>
     Term<out type1>             (.
-                                    if (type != TastierType.Integer || type1 != TastierType.Integer) {
-                                      SemErr("integer type expected");
+                                    if (type != TastierType.Integer) {
+                                      TypeErr(TastierType.Integer, type);
+                                    } else if (type1 != TastierType.Integer) {
+                                      TypeErr(TastierType.Integer, type1);
                                     }
                                     program.Add(inst);
                                 .)
@@ -496,14 +514,14 @@ Stat                            (.
   [ '?'                         (.
                                     conditional = true;
                                     if (type != TastierType.Boolean) {
-                                      SemErr("boolean expression expected in conditional assignment statement");
+                                      TypeErr(TastierType.Boolean, type);
                                     }
                                     string midLabel = generateLabel(); // label to jump to assign second expression
                                     program.Add(new Instruction("", "FJmp " + midLabel));
                                 .)
     Expr<out type1>              (.
                                     if (type1 != (TastierType) sym.Item3) {
-                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
+                                      TypeErr((TastierType) sym.Item3, type);
                                     }
                                     string endLabel = generateLabel();
                                     program.Add(new Instruction("", "Jmp " + endLabel));
@@ -512,14 +530,14 @@ Stat                            (.
     ':'
     Expr<out type2>              (.
                                     if (type2 != (TastierType) sym.Item3) {
-                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
+                                      TypeErr((TastierType) sym.Item3, type);
                                     }
                                     program.Add(new Instruction(endLabel, "Nop"));
                                 .)
   ]
   ';'                           (.
                                     if (!conditional && type != (TastierType) sym.Item3) {
-                                      SemErr("expected type " + sym.Item3 + ", got type " + type);
+                                      TypeErr((TastierType) sym.Item3, type);
                                     }
                                     if (sym.Item4 == 0) {
                                       program.Add(new Instruction("", "StoG " + (sym.Item5+3)));
@@ -542,8 +560,8 @@ Stat                            (.
 
 | "if"
   '(' Expr<out type> ')'        (.
-                                    if ((TastierType)type != TastierType.Boolean) {
-                                      SemErr("boolean type expected");
+                                    if (type != TastierType.Boolean) {
+                                      TypeErr(TastierType.Boolean, type);
                                     }
                                     openLabels.Push(generateLabel());
                                     program.Add(new Instruction("", "FJmp " + openLabels.Peek()));
@@ -590,7 +608,7 @@ Stat                            (.
   Expr<out type>
   ')' "do"                      (.
                                     if (type != TastierType.Boolean) {
-                                      SemErr("boolean expression expected in for loop condition");
+                                      TypeErr(TastierType.Boolean, type);
                                     }
                                     program.Add(new Instruction("", "FJmp " + endLabel));
                                 .)
@@ -616,8 +634,8 @@ Stat                            (.
                                       SemErr("variable type expected but " + sym.Item1 + " has kind " + (TastierType)sym.Item2);
                                     }
 
-                                    if (sym.Item3 != (int)TastierType.Integer) {
-                                      SemErr("integer type expected but " + sym.Item1 + " has type " + (TastierType)sym.Item2);
+                                    if ((TastierType) sym.Item3 != TastierType.Integer) {
+                                      TypeErr(TastierType.Integer, (TastierType) sym.Item3);
                                     }
                                     program.Add(new Instruction("", "Read"));
 
@@ -637,26 +655,10 @@ Stat                            (.
 
 | "write"
   Expr<out type>                (.
-                                    if (type == TastierType.Integer) {
-                                      program.Add(new Instruction("", "Write"));
-                                    } else if (type == TastierType.String) {
-                                      program.Add(new Instruction("", "WriteS"));
-                                    } else if (type == TastierType.Character) {
-                                      program.Add(new Instruction("", "WriteC"));
-                                    } else {
-                                      SemErr("integer, character or string type expected");
-                                    }
+                                    EmitWrite(type);
                                 .)
   { ',' Expr<out type>          (.
-                                    if (type == TastierType.Integer) {
-                                      program.Add(new Instruction("", "Write"));
-                                    } else if (type == TastierType.String) {
-                                      program.Add(new Instruction("", "WriteS"));
-                                    } else if (type == TastierType.Character) {
-                                      program.Add(new Instruction("", "WriteC"));
-                                    } else {
-                                      SemErr("integer, character or string type expected");
-                                    }
+                                    EmitWrite(type);
                                 .)
   } ';'
 
@@ -719,9 +721,10 @@ Term<out TastierType type>      (.  TastierType type1; Instruction inst; .)
 = Factor<out type>
   { MulOp<out inst>
     Factor<out type1>           (.
-                                    if (type != TastierType.Integer ||
-                                        type1 != TastierType.Integer) {
-                                      SemErr("integer type expected");
+                                    if (type != TastierType.Integer) {
+                                      TypeErr(TastierType.Integer, type);
+                                    } else if (type1 != TastierType.Integer) {
+                                      TypeErr(TastierType.Integer, type1);
                                     }
                                     program.Add(inst);
                                 .)
@@ -755,7 +758,7 @@ ConstDecl                       (.
   ":=" Expr<out exprType> ';'
                                 (.
                                     if (type != exprType) {
-                                      SemErr("incompatible types");
+                                      TypeErr(type, exprType);
                                     }
                                     if (openScopes.Count == 1) {
                                       program.Add(new Instruction("", "StoG " + (sym.Item5 + 3)));
