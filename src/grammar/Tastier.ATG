@@ -241,7 +241,7 @@ Symbol lookup(Stack<Scope> scopes, string name) {
 }
 
 void TypeErr(TastierType expected, TastierType actual) {
-  SemErr("expected type" + expected + ", got type " + actual);
+  SemErr("expected type " + expected + ", got type " + actual);
 }
 
 void EmitWrite(TastierType type) {
@@ -662,7 +662,72 @@ Stat                            (.
                                 .)
   } ';'
 
+| SwitchStatement
 | '{' { Stat | VarDecl<external> | ConstDecl } '}' .
+
+/*------------------------------------------------------------------------*/
+
+SwitchStatement                 (.  string name; string nextCaseLabel; string caseLabel = null; .)
+= "switch"
+  '(' Ident<out name> ')' '{'   (.
+                                    string endLabel = generateLabel();
+                                    Symbol sym = lookup(openScopes, name);
+                                    if (sym == null) {
+                                      SemErr("reference to undefined variable " + name);
+                                    }
+                                .)
+  {
+    Case<sym, endLabel, caseLabel, out nextCaseLabel>
+                                (.
+                                    caseLabel = nextCaseLabel;
+                                .)
+  }
+
+  '}'                           (.  program.Add(new Instruction(endLabel, "Nop")); .).
+
+/*------------------------------------------------------------------------*/
+
+Case<Symbol sym, string endLabel, string caseLabel, out string nextCaseLabel>
+                                (.  TastierType exprType; bool fallThrough = false; string nextLabel = generateLabel(); .)
+= ("case" Expr<out exprType>    (.
+                                    if ((TastierType) sym.Item3 != exprType) {
+                                      TypeErr((TastierType) sym.Item3, exprType);
+                                    } else {
+                                      if ((TastierKind) sym.Item2 == TastierKind.Var || (TastierKind) sym.Item2 == TastierKind.Const) {
+                                        if (sym.Item4 == 0) {
+                                          program.Add(new Instruction("", "LoadG " + (sym.Item5 + 3)));
+                                        } else {
+                                          int lexicalLevelDifference = Math.Abs(openScopes.Count - sym.Item4) - 1;
+                                          program.Add(new Instruction("", "Load " + lexicalLevelDifference + " " + sym.Item5));
+                                        }
+                                      } else {
+                                        SemErr("variable expected");
+                                      }
+                                    }
+                                    program.Add(new Instruction("", "Equ"));
+                                    program.Add(new Instruction("", "FJmp " + nextLabel));
+                                .)
+  |"default"
+  ) ':'                         (.
+                                    if (caseLabel != null) {
+                                      program.Add(new Instruction(caseLabel, "Nop"));
+                                    }
+                                .)
+  {Stat}
+  [
+    "fallthrough" ';'            (.
+                                    fallThrough = true;
+                                 .)
+  ]                              (.
+                                    nextCaseLabel = generateLabel();
+
+                                    if (!fallThrough) {
+                                      program.Add(new Instruction("", "Jmp " + endLabel));
+                                    } else {
+                                      program.Add(new Instruction("", "Jmp " + nextCaseLabel));
+                                    }
+                                    program.Add(new Instruction(nextLabel, "Nop"));
+                                  .).
 
 /*------------------------------------------------------------------------*/
 

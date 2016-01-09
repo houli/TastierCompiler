@@ -1,0 +1,24 @@
+program Test {
+  const int x := 3;
+
+  void Main() {
+    switch (x) {
+    case 4:
+      write "won't reach";
+    case 3:
+      write "will reach";
+      fallthrough;
+    case 5:
+      write "fallthrough works!";
+    default:
+      write "will not enter default";
+    }
+
+    switch (x) {
+    case 12:
+    case 20:
+    default:
+      write "will reach default here";
+    }
+  }
+}
