@@ -20,5 +20,12 @@ program Test {
     default:
       write "will reach default here";
     }
+
+    switch (x + 3) {
+    case 5:
+      write "will not reach";
+    case 6:
+      write "expressions work";
+    }
   }
 }
