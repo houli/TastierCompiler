@@ -1,0 +1,27 @@
+program Test {
+  void Main() {
+    string[2][3] strings;
+
+    // Array without initialisation
+    int[] blah;
+
+    // Array with initialisation
+    int[3][4] numbers;
+
+    // Assignment of nested array
+    blah := numbers[0];
+
+    numbers[0][1] := 40;
+    numbers[1][2] := 50;
+
+    int x;
+    x := numbers[1][2];
+
+    strings[1][2] := "Hello";
+
+    write x;
+    write strings[1][2];
+    write blah[1];
+    write numbers[1][2] + 3;
+  }
+}
