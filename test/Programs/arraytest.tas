@@ -17,11 +17,13 @@ program Test {
     int x;
     x := numbers[1][2];
 
-    strings[1][2] := "Hello";
+    const int index := 2;
+
+    strings[1][index] := "Hello";
 
     write x;
-    write strings[1][2];
+    write strings[1][index];
     write blah[1];
-    write numbers[1][2] + 3;
+    write numbers[1][index] + 3;
   }
 }

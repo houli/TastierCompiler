@@ -929,7 +929,11 @@ VarDecl<bool external>          (.
                                     if (dimensionRequired == 2) {
                                       SemErr("Previous dimensions not specified");
                                     }
-                                    lengths.Add(Convert.ToInt32(t.val));
+                                    int length = Convert.ToInt32(t.val);
+                                    if (length <= 0) {
+                                      SemErr("Array length cannot be <= 0");
+                                    }
+                                    lengths.Add(length);
                                     dimensionRequired = 1;
                                 .)
         ]
