@@ -34,18 +34,25 @@ COMPILER Tastier
 
 Dictionary<string, Record> recordDeclarations = new Dictionary<string, Record>();
 
+Record lookupRecordId(int id) {
+  foreach (Record rec in recordDeclarations.Values) {
+    if (rec.Item1 == id) {
+      return rec;
+    }
+  }
+  return null;
+}
+
 // Used to uniquely identify each record
 int recordsDeclared = 0;
 
-int memberOffset(Record record, string member) {
-  int count = 1;
+bool memberExists(Record record, string member) {
   foreach (RecordVar variable in record.Item2) {
     if (variable.Item1 == member) {
-      return count;
+      return true;
     }
-    count++;
   }
-  return -1;
+  return false;
 }
 
 /*
@@ -402,16 +409,41 @@ Factor<out TastierType type>    (.  int n; Symbol sym; string name; .)
                                       isExternal = true;
                                     }
                                 .)
-    { '[' Expr<out type>        (.
+    ( '.' Ident<out name>       (.
+                                    if ((TastierType) sym.Item3 != TastierType.Record) {
+                                      TypeErr(TastierType.Record, (TastierType) sym.Item3);
+                                    }
+                                    Record rec = lookupRecordId(sym.Item7);
+                                    if (memberExists(rec, name)) {
+                                      sym = lookup(openScopes, "_" + sym.Item1 + "." + name);
+                                    } else {
+                                      SemErr(sym.Item1 + " does not contain member " + name);
+                                    }
+                                .)
+    | { '[' Expr<out type>      (.
                                     if (type != TastierType.Integer) {
                                       TypeErr(TastierType.Integer, type);
                                     }
                                     arrayAccessDepth++;
                                 .)
-      ']'
-    }                           (.
+        ']'
+      }
+    )                           (.
                                     if (sym == null) {
                                       SemErr("reference to undefined variable " + name);
+                                    } else if ((TastierType) sym.Item3 == TastierType.Record) {
+                                      type = TastierType.Record;
+                                      Record rec = lookupRecordId(sym.Item7);
+                                      for (int i = rec.Item2.Count - 1; i >= 0 ; i--) {
+                                        RecordVar member = rec.Item2[i];
+                                        Symbol memberSym = lookup(openScopes, "_" + sym.Item1 + "." + member.Item1);
+                                        if (memberSym.Item4 == 0) {
+                                          program.Add(new Instruction("", "LoadG " + (memberSym.Item5+3)));
+                                        } else {
+                                          int lexicalLevelDifference = Math.Abs(openScopes.Count - memberSym.Item4)-1;
+                                          program.Add(new Instruction("", "Load " + lexicalLevelDifference + " " + memberSym.Item5));
+                                        }
+                                      }
                                     } else {
                                       type = (TastierType)sym.Item3;
                                       if ((TastierKind)sym.Item2 == TastierKind.Var || (TastierKind)sym.Item2 == TastierKind.Const) {
@@ -1023,7 +1055,7 @@ VarDecl<bool external>          (.
                                     }
                                     if (recordDecl) {
                                       foreach (RecordVar member in rec.Item2) {
-                                        currentScope.Push(new Symbol("", (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
+                                        currentScope.Push(new Symbol("_" + name + "." + member.Item1, (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
                                       }
                                     }
                                 .)
@@ -1047,7 +1079,7 @@ VarDecl<bool external>          (.
                                     }
                                     if (recordDecl) {
                                       foreach (RecordVar member in rec.Item2) {
-                                        currentScope.Push(new Symbol("", (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
+                                        currentScope.Push(new Symbol("_" + name + "." + member.Item1, (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
                                       }
                                     }
                                 .)
