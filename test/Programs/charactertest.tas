@@ -1,6 +1,6 @@
 program Test {
   const char x := '3';
-  void Main() {
+  func Main() {
     char y;
     y := '*';
     const char z := 'r';

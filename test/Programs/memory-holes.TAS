@@ -4,24 +4,24 @@
 program Test {
   int i;
 
-  void Foo() {
+  func Foo() {
     int a, b, max;
     read a; read b;
-    if (a > b) max = a; else max = b;
+    if (a > b) max := a; else max := b;
     write max;
   }
 
   int j;
 
-  void SumUp() {
-    i = j;
+  func SumUp() {
+    i := j;
     int sum;
-    sum = 0;
-    while (i > 0) { sum = sum + i; i = i - 1; }
+    sum := 0;
+    while (i > 0) { sum := sum + i; i := i - 1; }
     write sum;
   }
 
-  void Main() {
+  func Main() {
     read j;
     while (j > 0) {
       SumUp();

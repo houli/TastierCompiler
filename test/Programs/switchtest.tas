@@ -1,7 +1,7 @@
 program Test {
   const int x := 3;
 
-  void Main() {
+  func Main() {
     switch (x) {
     case 4:
       write "won't reach";

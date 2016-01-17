@@ -3,25 +3,25 @@
 program Test {
   int t;
 
-  void func() {
+  func func1() {
     int local;
     int local2;
 
-    void func2() {
+    func func2() {
       write local2;
       write t;
     }
 
-    local2 = 4;
-    local = 12;
+    local2 := 4;
+    local := 12;
     func2();
     write local2;
     write local;
   }
 
-  void Main() {
-      t = 42;
-      func();
+  func Main() {
+      t := 42;
+      func1();
       write t;
   }
 }

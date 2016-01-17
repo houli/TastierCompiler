@@ -3,14 +3,14 @@
 program Test {
   int i;
 
-  void Main() {
+  func Main() {
     write -3;
     read i;
     if (i > 10) {
       int sum;
-      sum = 0;
+      sum := 0;
       while (i > 0) {
-        sum = sum + i; i = i - 1;
+        sum := sum + i; i := i - 1;
       }
       write sum;
     } else {

@@ -1,6 +1,6 @@
 program Test {
   string x;
-  void Main() {
+  func Main() {
     x := 2 > 3 ? "wowee" : "zip";
     write x;
     x := 2 = 3 ? "true?" : "false?";

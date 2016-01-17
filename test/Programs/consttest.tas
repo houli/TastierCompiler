@@ -1,7 +1,7 @@
 program Test {
   const int x := 12;
 
-  void Main() {
+  func Main() {
     int y;
     y := 4;
     const int z := x - y;

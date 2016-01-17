@@ -5,14 +5,14 @@
 program Test {
   int i;
 
-  void SumUp() {
+  func SumUp() {
     int sum;
-    sum = 0;
-    while (i > 0) { sum = sum + i; i = i - 1; }
+    sum := 0;
+    while (i > 0) { sum := sum + i; i := i - 1; }
     write sum;
   }
 
-  void Main() {
+  func Main() {
     read i;
     while (i > 0) {
       SumUp();

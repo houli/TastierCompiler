@@ -1,5 +1,5 @@
 program Test {
-  void Main() {
+  func Main() {
     string[2][3] strings;
 
     // Array without initialisation

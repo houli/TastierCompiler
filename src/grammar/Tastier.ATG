@@ -462,7 +462,7 @@ MulOp<out Instruction inst>
 /*------------------------------------------------------------------------*/
 
 ProcDecl                        (.  string name; string label; Scope currentScope = openScopes.Peek(); int enterInstLocation = 0; bool external = false; .)
-= "void"
+= "func"
   Ident<out name>               (.
                                     currentScope.Push(new Symbol(name, (int)TastierKind.Proc, (int)TastierType.Undefined, openScopes.Count, -1, 0, 0));
                                     openScopes.Push(new Scope());
