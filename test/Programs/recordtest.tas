@@ -15,8 +15,6 @@ program Test {
     int z;
     z := var1.y;
 
-    write x.x;
-    write x.y;
-    write z;
+    write x.x, x.y, z;
   }
 }

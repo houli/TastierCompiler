@@ -43,9 +43,10 @@ Record lookupRecordId(int id) {
   return null;
 }
 
-// Used to uniquely identify each record
+// Used to uniquely identify each record declared
 int recordsDeclared = 0;
 
+// Returns whether a member name is valid for a given record
 bool memberExists(Record record, string member) {
   foreach (RecordVar variable in record.Item2) {
     if (variable.Item1 == member) {
@@ -279,10 +280,12 @@ Symbol lookup(Stack<Scope> scopes, string name) {
   return null; // if the name wasn't found in any open scopes.
 }
 
+// Generic type error function used throughout the code
 void TypeErr(TastierType expected, TastierType actual) {
   SemErr("expected type " + expected + ", got type " + actual);
 }
 
+// Emits a write instruction depending on the type of the expression
 void EmitWrite(TastierType type) {
   if (type == TastierType.Integer) {
     program.Add(new Instruction("", "Write"));
@@ -295,6 +298,14 @@ void EmitWrite(TastierType type) {
   }
 }
 
+/*
+  Creates the array structure for an array initialiser
+  Arrays are initialised at the end of memory backwards
+  The initialiser [2][3] assuming the base address of 4093 will give in memory
+  2 4090 4086 3 0 0 0 3 0 0 0 ........
+  Each array has a length at the beginning and if it is a multidimensional array
+  all members will be pointers to the next level, otherwise 0
+*/
 void AllocateArray(List<int> lengths) {
   // Keep reference to pointer to beginning of array structure
   int temp = globalStorePosition;
@@ -432,6 +443,7 @@ Factor<out TastierType type>    (.  int n; Symbol sym; string name; .)
                                     if (sym == null) {
                                       SemErr("reference to undefined variable " + name);
                                     } else if ((TastierType) sym.Item3 == TastierType.Record) {
+                                      // If we are accessing a record push all of its values onto the stack
                                       type = TastierType.Record;
                                       Record rec = lookupRecordId(sym.Item7);
                                       for (int i = rec.Item2.Count - 1; i >= 0 ; i--) {
@@ -461,6 +473,8 @@ Factor<out TastierType type>    (.  int n; Symbol sym; string name; .)
                                       } else SemErr("variable expected");
                                       if (arrayAccessDepth > 0) {
                                         if (arrayAccessDepth == sym.Item7) {
+                                          // If we provide enough dimensions the type should be the base type of the array
+                                          // If not we will return "Array" indicating that it is a pointer to the next level of the array
                                           type = (TastierType) sym.Item6;
                                         } else if (arrayAccessDepth > sym.Item7) {
                                           SemErr("Too many dimensions specified");
@@ -489,6 +503,7 @@ Factor<out TastierType type>    (.  int n; Symbol sym; string name; .)
                                     type = TastierType.String;
                                 .)
   | character                   (.
+                                    // t.val[0] and t.val[2] will be our quotes. t.val[1] is our character
                                     char c = t.val[1];
                                     program.Add(new Instruction("", "Const " + (int) c));
                                     type = TastierType.Character;
@@ -623,6 +638,7 @@ Stat                            (.
                                 .)
   (  ( '.' Ident<out name>      (.
                                     if ((TastierType) sym.Item3 != TastierType.Record) {
+                                      // Can only use '.' syntax on record values
                                       TypeErr(TastierType.Record, (TastierType) sym.Item3);
                                     }
                                     Record rec = lookupRecordId(sym.Item7);
@@ -631,6 +647,7 @@ Stat                            (.
                                     } else {
                                       SemErr(sym.Item1 + " does not contain member " + name);
                                     }
+                                    // The type will be the type of the member
                                     type = (TastierType) sym.Item3;
                                 .)
 
@@ -645,6 +662,7 @@ Stat                            (.
                                     type = (TastierType) sym.Item3;
                                     if (arrayAccessDepth > 0) {
                                       if (arrayAccessDepth == sym.Item7) {
+                                        // If enough dimensions provided, the type of this value is the base type
                                         type = (TastierType) sym.Item6;
                                       } else if (arrayAccessDepth > sym.Item7) {
                                         SemErr("Too many dimensions specified");
@@ -848,11 +866,13 @@ Stat                            (.
 SwitchStatement                 (.  TastierType type; string nextCaseLabel; string caseLabel = null; .)
 = "switch"
   '(' Expr<out type> ')' '{'   (.
+                                    // The label that we will exit from
                                     string endLabel = generateLabel();
                                .)
   {
     Case<type, endLabel, caseLabel, out nextCaseLabel>
                                 (.
+                                    // The label for the body of the next case. Used for falling through
                                     caseLabel = nextCaseLabel;
                                 .)
   }
@@ -867,12 +887,16 @@ SwitchStatement                 (.  TastierType type; string nextCaseLabel; stri
 
 Case<TastierType type, string endLabel, string caseLabel, out string nextCaseLabel>
                                 (.  TastierType exprType; bool fallThrough = false; string nextLabel = generateLabel(); .)
-= ("case"                       (.  program.Add(new Instruction("", "Dup")); .)
+= ("case"                       (.
+                                    // Clone top of stack so we can use it in the next "case"
+                                    program.Add(new Instruction("", "Dup"));
+                                .)
    Expr<out exprType>           (.
                                     if (type != exprType) {
                                       TypeErr(type, exprType);
                                     } else {
                                       program.Add(new Instruction("", "Equ"));
+                                      // If this case doesn't match jump to the next comparison
                                       program.Add(new Instruction("", "FJmp " + nextLabel));
                                     }
                                 .)
@@ -891,10 +915,13 @@ Case<TastierType type, string endLabel, string caseLabel, out string nextCaseLab
                                     nextCaseLabel = generateLabel();
 
                                     if (!fallThrough) {
+                                      // Not falling through, exit switch statement
                                       program.Add(new Instruction("", "Jmp " + endLabel));
                                     } else {
+                                      // Falling through, jump to the body of the next case
                                       program.Add(new Instruction("", "Jmp " + nextCaseLabel));
                                     }
+                                    // Next comparison
                                     program.Add(new Instruction(nextLabel, "Nop"));
                                 .).
 
@@ -1017,6 +1044,8 @@ VarDecl<bool external>          (.
                                 .)
 = ( Type<out type>
     {
+                                // Here we can either initialise an array with dimensions
+                                // or leave them as optional
       ( '[' number              (.
                                     arrayDimensions++;
                                     if (dimensionRequired == 2) {
@@ -1082,6 +1111,7 @@ VarDecl<bool external>          (.
                                       }
                                     }
                                     if (recordDecl) {
+                                      // Create symbols for each member of this record instance
                                       foreach (RecordVar member in rec.Item2) {
                                         currentScope.Push(new Symbol("_" + name + "." + member.Item1, (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
                                       }
@@ -1106,6 +1136,7 @@ VarDecl<bool external>          (.
                                       }
                                     }
                                     if (recordDecl) {
+                                      // Create symbols for each member of this record instance
                                       foreach (RecordVar member in rec.Item2) {
                                         currentScope.Push(new Symbol("_" + name + "." + member.Item1, (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
                                       }
