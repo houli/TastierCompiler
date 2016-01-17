@@ -1,0 +1,12 @@
+program Test {
+  define record test {
+    int x;
+    int y;
+    int[][] z;
+  }
+
+  func Main() {
+    record test var1, var2;
+    write 3;
+  }
+}

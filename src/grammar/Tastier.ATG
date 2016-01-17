@@ -10,7 +10,8 @@ COMPILER Tastier
     Boolean,
     String,
     Character,
-    Array
+    Array,
+    Record
   };
 
   enum TastierKind : int {  // kinds of symbol
@@ -18,6 +19,34 @@ COMPILER Tastier
     Proc,
     Const
   };
+
+/* using RecordVar = System.Tuple<string, int, int, int>
+    * RecordVar.Item1 -> Member name
+    * RecordVar.Item2 -> Type
+    * RecordVar.Item3 -> Base type (only for arrays)
+    * RecordVar.Item4 -> Level of indirection
+*/
+
+/* using Record = System.Tuple<int, System.Collections.Generic.List<RecordVar>>
+    * Record.Item1 -> id of this record
+    * Record.Item2 -> List of variables in this record
+*/
+
+Dictionary<string, Record> recordDeclarations = new Dictionary<string, Record>();
+
+// Used to uniquely identify each record
+int recordsDeclared = 0;
+
+int memberOffset(Record record, string member) {
+  int count = 1;
+  foreach (RecordVar variable in record.Item2) {
+    if (variable.Item1 == member) {
+      return count;
+    }
+    count++;
+  }
+  return -1;
+}
 
 /*
   You'll notice some type aliases, such as the one just below, are commented
@@ -546,7 +575,7 @@ SimExpr<out TastierType type>   (.  TastierType type1; Instruction inst; .)
 
 Stat                            (.
                                     TastierType type; string name; Symbol sym; bool external = false; bool isExternal = false;
-                                    bool conditional = false; TastierType type1; TastierType type2;
+                                    bool conditional = false; TastierType type1;
                                 .)
 
 = Ident<out name>               (.
@@ -829,7 +858,7 @@ Tastier                         (.  string name; bool external = false; .)
                                     */
                                 .)
     ProcDecl                    (. program.Add(new Instruction(openLabels.Pop(), "Nop")); .)
-  | ExternDecl }
+  | ExternDecl | RecordDecl }
   '}'                           (.
                                     if (openScopes.Peek().Count == 0) {
                                       Warn("Warning: Program " + name + " is empty ");
@@ -915,17 +944,21 @@ ConstDecl                       (.
 /*------------------------------------------------------------------------*/
 
 VarDecl<bool external>          (.
-                                    string name; TastierType type; Scope currentScope = openScopes.Peek();
+                                    string name;
+                                    TastierType type = TastierType.Undefined;
+                                    Scope currentScope = openScopes.Peek();
                                     string outstr = openScopes.Count == 1 ? "[Global Variable]\t" : "[Variable]\t\t";
                                     TastierType arrayType = TastierType.Undefined;
                                     int arrayDimensions = 0;
                                     List<int> lengths = new List<int>();
                                     int dimensionRequired = 0;
+                                    bool recordDecl = false;
+                                    Record rec = null;
                                 .)
-= Type<out type>
-  {
-    '[' [
-          number                (.
+= ( Type<out type>
+    {
+      ( '[' number              (.
+                                    arrayDimensions++;
                                     if (dimensionRequired == 2) {
                                       SemErr("Previous dimensions not specified");
                                     }
@@ -935,9 +968,13 @@ VarDecl<bool external>          (.
                                     }
                                     lengths.Add(length);
                                     dimensionRequired = 1;
+                                    if (arrayType == TastierType.Undefined) {
+                                      arrayType = type;
+                                      type = TastierType.Array;
+                                    }
                                 .)
-        ]
-    ']'                         (.
+        ']'
+      | "[]"                    (.
                                     arrayDimensions++;
                                     if (dimensionRequired == 1) {
                                       if (arrayDimensions != lengths.Count) {
@@ -951,7 +988,20 @@ VarDecl<bool external>          (.
                                       type = TastierType.Array;
                                     }
                                 .)
-  }
+      )
+    }
+  | "record" Ident<out name>    (.
+                                    recordDecl = true;
+                                    if (recordDeclarations.ContainsKey(name)) {
+                                      rec = recordDeclarations[name];
+                                      type = TastierType.Record;
+                                      // Use array dimensions field as storage for the id of the record
+                                      arrayDimensions = rec.Item1;
+                                    } else {
+                                      SemErr("Record " + name + " does not exist");
+                                    }
+                                .)
+  )
   Ident<out name>               (.
                                     int count = currentScope.Count(s => s.Item2 != (int)TastierKind.Proc);
                                     Console.WriteLine(outstr + "[Ident: " + name + "]\t[Type: " + type + "]\t[Scope: " + (openScopes.Count - 1) + "]\t[Address: " + count + "]");
@@ -969,6 +1019,11 @@ VarDecl<bool external>          (.
                                         program.Add(new Instruction("", "StoG " + (sym.Item5 + 3)));
                                       } else {
                                         program.Add(new Instruction("", "Sto 0 " + sym.Item5));
+                                      }
+                                    }
+                                    if (recordDecl) {
+                                      foreach (RecordVar member in rec.Item2) {
+                                        currentScope.Push(new Symbol("", (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
                                       }
                                     }
                                 .)
@@ -990,14 +1045,54 @@ VarDecl<bool external>          (.
                                         program.Add(new Instruction("", "Sto 0 " + sym.Item5));
                                       }
                                     }
+                                    if (recordDecl) {
+                                      foreach (RecordVar member in rec.Item2) {
+                                        currentScope.Push(new Symbol("", (int) TastierKind.Var, member.Item2, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), member.Item3, member.Item4));
+                                      }
+                                    }
                                 .)
   } ';'.
+
+/*------------------------------------------------------------------------*/
 
 ExternDecl                      (.  string name; bool external = true; Scope currentScope = openScopes.Peek(); int count = currentScope.Count; .)
 = "external"
   ( VarDecl<external>
   | "procedure" Ident<out name> ';'
                                 (.  externalDeclarations.Push(new Symbol(name, (int)TastierKind.Proc, (int)TastierType.Undefined, 1, -1, 0, 0)); .)
-  ) .
+  ).
+
+/*------------------------------------------------------------------------*/
+
+RecordDecl                      (.
+                                    TastierType type;
+                                    string name;
+                                    string memberName;
+                                .)
+= "define"
+  "record" Ident<out name> '{'  (.  List<RecordVar> variables = new List<RecordVar>(); .)
+  {
+    Type<out type>              (.
+                                    TastierType arrayType = TastierType.Undefined;
+                                    int arrayDepth = 0;
+                                .)
+    {
+      "[]"                      (.
+                                    arrayDepth++;
+                                    if (arrayType == TastierType.Undefined) {
+                                      arrayType = type;
+                                      type = TastierType.Array;
+                                    }
+                                .)
+    }
+    Ident<out memberName> ';'   (.
+                                    variables.Add(new RecordVar(memberName, (int) type, (int) arrayType, arrayDepth));
+                                .)
+  }
+  '}'
+                                (.
+                                    Record record = new Record(recordsDeclared++, variables);
+                                    recordDeclarations.Add(name, record);
+                                .).
 
 END Tastier.

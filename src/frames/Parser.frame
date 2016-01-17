@@ -33,6 +33,8 @@ using System.Linq;
 using Symbol = System.Tuple<string, int, int, int, int, int, int>;
 using Instruction = System.Tuple<string,string>;
 using StackAddress = System.Tuple<int, int>;
+using RecordVar = System.Tuple<string, int, int, int>;
+using Record = System.Tuple<int, System.Collections.Generic.List<System.Tuple<string, int, int, int>>>;
 
 -->namespace
 
