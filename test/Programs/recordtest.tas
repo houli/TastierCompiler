@@ -1,14 +1,22 @@
 program Test {
-  define record test {
+  define record example {
     int x;
     int y;
     int[][] z;
   }
 
   func Main() {
-    record test var1, var2;
-    record test x;
+    record example var1, x;
+    var1.x := 23;
+
     x := var1;
-    write 3;
+
+    var1.y := 25;
+    int z;
+    z := var1.y;
+
+    write x.x;
+    write x.y;
+    write z;
   }
 }

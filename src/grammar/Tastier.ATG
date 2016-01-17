@@ -621,14 +621,27 @@ Stat                            (.
                                       SemErr("reference to undefined variable " + name);
                                     }
                                 .)
-  (  { '[' Expr<out type>       (.
+  (  ( '.' Ident<out name>      (.
+                                    if ((TastierType) sym.Item3 != TastierType.Record) {
+                                      TypeErr(TastierType.Record, (TastierType) sym.Item3);
+                                    }
+                                    Record rec = lookupRecordId(sym.Item7);
+                                    if (memberExists(rec, name)) {
+                                      sym = lookup(openScopes, "_" + sym.Item1 + "." + name);
+                                    } else {
+                                      SemErr(sym.Item1 + " does not contain member " + name);
+                                    }
+                                    type = (TastierType) sym.Item3;
+                                .)
+
+     | { '[' Expr<out type>     (.
                                     if (type != TastierType.Integer) {
                                       TypeErr(TastierType.Integer, type);
                                     }
                                     arrayAccessDepth++;
                                 .)
-       ']'
-     }                          (.
+         ']'
+       }                        (.
                                     type = (TastierType) sym.Item3;
                                     if (arrayAccessDepth > 0) {
                                       if (arrayAccessDepth == sym.Item7) {
@@ -638,6 +651,7 @@ Stat                            (.
                                       }
                                     }
                                 .)
+     )
     ":="                        (.
                                     if ((TastierKind)sym.Item2 == TastierKind.Const) {
                                       SemErr("constant identifier " + name + " cannot be reassigned");
@@ -674,7 +688,19 @@ Stat                            (.
                                     if (!conditional && type1 != type) {
                                       TypeErr(type, type1);
                                     }
-                                    if (arrayAccessDepth == 0) {
+                                    if ((TastierType) sym.Item3 == TastierType.Record) {
+                                      // Reassign all record fields
+                                      Record rec = lookupRecordId(sym.Item7);
+                                      foreach (RecordVar member in rec.Item2) {
+                                        Symbol memberSym = lookup(openScopes, "_" + sym.Item1 + "." + member.Item1);
+                                        if (memberSym.Item4 == 0) {
+                                          program.Add(new Instruction("", "StoG " + (memberSym.Item5+3)));
+                                        } else {
+                                          int lexicalLevelDifference = Math.Abs(openScopes.Count - memberSym.Item4)-1;
+                                          program.Add(new Instruction("", "Sto " + lexicalLevelDifference + " " + memberSym.Item5));
+                                        }
+                                      }
+                                    } else if (arrayAccessDepth == 0) {
                                       if (sym.Item4 == 0) {
                                         program.Add(new Instruction("", "StoG " + (sym.Item5+3)));
                                       } else {
@@ -682,6 +708,7 @@ Stat                            (.
                                         program.Add(new Instruction("", "Sto " + lexicalLevelDifference + " " + sym.Item5));
                                       }
                                     } else {
+                                      // Array assignment, first we must put the base address of the array on the stack
                                       if (sym.Item4 == 0) {
                                         if (isExternal) {
                                           program.Add(new Instruction("", "LoadG " + sym.Item1));
@@ -693,6 +720,7 @@ Stat                            (.
                                         int lexicalLevelDifference = Math.Abs(openScopes.Count - sym.Item4)-1;
                                         program.Add(new Instruction("", "Load " + lexicalLevelDifference + " " + sym.Item5));
                                       }
+                                      // Store the value at stack - 1 at memory address stored at stack - 2
                                       program.Add(new Instruction("", "StoArr " + arrayAccessDepth));
                                     }
                                 .)
